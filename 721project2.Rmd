@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-### --- Link to github: https://github.com/Z367/project2 --- ###
+### --- Link to github: https://github.com/Z367/721Project2.git --- ###
 Sys.setenv(LANG = "en")
 Sys.setlocale("LC_TIME", "English")
 library(tidyverse)
