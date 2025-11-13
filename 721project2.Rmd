@@ -1,0 +1,190 @@
+---
+title: "721project2"
+author: "Zhuozhe"
+date: "2025-11-13"
+output: 
+  word_document: 
+    fig_width: 8
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+### --- Link to github: https://github.com/Z367/project2 --- ###
+Sys.setenv(LANG = "en")
+Sys.setlocale("LC_TIME", "English")
+library(tidyverse)
+library(ggplot2)
+library(lubridate)
+library(janitor)
+library(here)
+library(dplyr)
+setwd("~/R721")
+p2018 <- read.csv("AQ_2018.csv", check.names = FALSE) %>% mutate(year = 2018)
+p2019 <- read.csv("AQ_2019.csv", check.names = FALSE) %>% mutate(year = 2019)
+p2020 <- read.csv("AQ_2020.csv", check.names = FALSE) %>% mutate(year = 2020)
+```
+
+```{r}
+# --- Date cleaning ---
+clean_aq_data <- function(data) {
+  
+  data %>%
+    
+    # Rename columns to be short and informative
+    rename(                                     
+      co = `Daily Max 8-hour CO Concentration`,
+      pm25 = `Daily Mean PM2.5 Concentration`,
+      o3 = `Daily Max 8-hour Ozone Concentration`
+    ) %>%
+    
+    # Correct the date to mdy
+    mutate(Date = mdy(Date)
+    ) %>%
+    
+    # Set negative measurements to zero with pmax
+    mutate(
+      co = pmax(co, 0),
+      pm25 = pmax(pm25, 0),
+      o3 = pmax(o3, 0)
+    ) %>%
+    
+    # Remove identical rows
+    distinct() %>%
+    
+    # Calculate the daily average for days with multiple measurements
+    group_by(Date, year) %>%
+    summarize(
+      co_avg = mean(co, na.rm = TRUE),
+      pm25_avg = mean(pm25, na.rm = TRUE),
+      o3_avg = mean(o3, na.rm = TRUE),
+      .groups = "drop" 
+    )
+}
+
+# Apply the above function to the three dataset
+p2018_cleaned <- clean_aq_data(p2018)
+p2019_cleaned <- clean_aq_data(p2019)
+p2020_cleaned <- clean_aq_data(p2020)
+
+
+# --- plot1: CO and O3 concentration ---
+# Combine three to one 
+all_data <- bind_rows(p2018_cleaned, p2019_cleaned, p2020_cleaned) 
+
+# create subset of data for plot1
+plot1_data <- all_data %>%
+  
+  # Create a month column
+  mutate(month = month(Date, label = TRUE)) %>%
+  
+  # Pivot longer CO and O3 into one column called concentration
+  # Include pollutant to distinguish these two
+  pivot_longer(
+    cols = c(co_avg, o3_avg),
+    names_to = "pollutant",
+    values_to = "concentration"
+  ) %>%
+  filter(!is.na(concentration)) %>%
+  
+  # Clean up the names for the legend
+  mutate(
+    pollutant_label = recode(pollutant,
+                             "co_avg" = "CO",
+                             "o3_avg" = "Ozone")
+  )
+
+
+plot1 <- ggplot(plot1_data, 
+                # Map month to x, concentration to y.
+                aes(x = month, 
+                    y = concentration, 
+                    color = pollutant_label, 
+                    group = pollutant_label)) +
+  
+  # stat_summary() to get 95% CI error bars. 
+  stat_summary(
+    fun.data = "mean_cl_normal", 
+    geom = "errorbar",
+    width = 0.2, 
+    linewidth = 0.8
+  ) +
+  
+  # Add the mean as a line
+  stat_summary(
+    fun = "mean",
+    geom = "line",
+    linewidth = 0.2
+  ) +
+  
+  # Add the mean as points
+  stat_summary(
+    fun = "mean",
+    geom = "point",
+    size = 2
+  ) +
+  
+  # Add labels, title, and theme
+  labs(
+    title = "Monthly Average Air Pollutants (2018-2020)",
+    subtitle = "Points show 3-year monthly average. Error bars show 95% CI.",
+    x = "Month",
+    y = "Concentration (ppm)",
+    color = "Pollutant" 
+  ) +
+  theme_minimal(base_size = 14) +
+  
+  # colorblind friendly 
+  scale_color_brewer(palette = "Set1")
+
+print(plot1)
+
+# --- Plot 2: PM25 Monthly Average by Year ---
+
+
+# Create subset data for plot2
+plot2_data <- all_data %>%
+  mutate(
+    month = month(Date, label = TRUE, abbr = TRUE),
+    
+    # Treat 'year' as a categorical variable (factor)
+    # This is crucial for coloring by year correctly
+    year_factor = factor(year)
+  ) %>%
+  
+  # Group by both year and month
+  group_by(year_factor, month) %>%
+  
+  # Calculate the average PM2.5 for each group
+  summarize(
+    monthly_pm25 = mean(pm25_avg, na.rm = TRUE),
+    .groups = "drop" # Ungroup after summarizing
+  )
+
+# Create the plot
+plot2 <- ggplot(plot2_data, 
+                # Map month to x and average to y
+                # Color by the year_factor
+                # Group by so that ggplot knows to draw 3 separate lines.
+                aes(x = month, 
+                    y = monthly_pm25, 
+                    color = year_factor, 
+                    group = year_factor)) +
+  
+  # Add the lines the points
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 3) +
+  
+  
+  # Add labels, title, and theme
+  labs(
+    title = "Monthly Average PM2.5 Concentration by Year",
+    subtitle = "Note: 2020 data is incomplete and only includes Jan-Apr.",
+    x = "Month",
+    y = "PM2.5 Concentration (µg/m³)",
+    color = "Year" 
+  ) +
+  scale_color_brewer(palette = "Set2") +
+  theme_minimal(base_size = 14)
+
+print(plot2)
+```
