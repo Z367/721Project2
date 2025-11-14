@@ -2,7 +2,6 @@
 
 ## Data Sources
 - **Air Quality Data**: Daily measurements of CO, PM2.5, and O3 from the RDU airport monitor (2018–2020).
-- **Health Data**: Emergency department visits and hospitalizations for SCD (provided by Duke hematologist).
 
 ## Files Included
 - `AQ_2018.csv`, `AQ_2019.csv`, `AQ_2020.csv`: Raw air quality data
